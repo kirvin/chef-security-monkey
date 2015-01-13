@@ -1,5 +1,5 @@
 default['security_monkey']['basedir'] = '/opt/secmonkey'
-default['security_monkey']['branch'] = 'master'
+default['security_monkey']['branch'] = '0_1_2_test_1'
 
 # specify your own secret and salt
 default['security_monkey']['secret_key'] = nil

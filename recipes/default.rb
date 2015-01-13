@@ -24,6 +24,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+package "swig"
 include_recipe "python::default"
 python_pip "setuptools"
 
@@ -60,9 +61,21 @@ git node['security_monkey']['basedir'] do
   notifies :run, "bash[install_security_monkey]", :immediately
 end
 
+# set up logging
+bash 'set_up_logging' do
+  user "root"
+  code <<-EOF
+  mkdir /var/log/securitymonkey
+  touch /var/log/securitymonkey/security_monkey.error.log
+  touch /var/log/securitymonkey/security_monkey.access.log
+  touch /var/log/securitymonkey/security_monkey-deploy.log
+  chown -R #{node['security_monkey']['user']} /var/log/securitymonkey
+  EOF
+end
+
 bash "install_security_monkey" do
-  environment ({ 'HOME' => node['security_monkey']['homedir'], 
-    'USER' => node['security_monkey']['user'], 
+  environment ({ 'HOME' => node['security_monkey']['homedir'],
+    'USER' => node['security_monkey']['user'],
     "SECURITY_MONKEY_SETTINGS" => "#{node['security_monkey']['basedir']}/env-config/config-deploy.py" })
   #user "#{node['security_monkey']['user']}"
   user "root"
@@ -70,6 +83,14 @@ bash "install_security_monkey" do
   cwd node['security_monkey']['basedir']
   code <<-EOF
   python setup.py install
+  EOF
+  action :nothing
+end
+
+bash "set_install_ownership" do
+  cwd node['security_monkey']['basedir']
+  code <<-EOF
+  chown -R #{node['security_monkey']['user']}:#{node['security_monkey']['group']} ./*
   EOF
   action :nothing
 end
@@ -113,26 +134,19 @@ bash "create_database" do
   python manage.py db upgrade
   EOF
   environment "SECURITY_MONKEY_SETTINGS" => "#{node['security_monkey']['basedir']}/env-config/config-deploy.py"
-  not_if "psql -lqt | cut -d \| -f 1 | grep -w secmonkey", :user => 'posstgres'
+  not_if "psql -lqt | cut -d \| -f 1 | grep -w secmonkey", :user => 'postgres'
   action :nothing
 end
 
 #ensure supervisor is available
 package "supervisor"
 
-template "#{node['security_monkey']['basedir']}/supervisor/security_monkey.ini" do
+template '/etc/supervisor/conf.d/security_monkey.conf' do
   mode "0644"
   source "supervisor/security_monkey.ini.erb"
-  notifies :run, "bash[install_supervisor]"
+  # notifies :run, "bash[install_supervisor]"
 end
 
-bash "install_supervisor" do
-  user "root"
-  cwd "#{node['security_monkey']['basedir']}/supervisor"
-  code <<-EOF
-  sudo -E supervisord -c security_monkey.ini
-  sudo -E supervisorctl -c security_monkey.ini
-  EOF
-  environment 'SECURITY_MONKEY_SETTINGS' => "#{node['security_monkey']['basedir']}/env-config/config-deploy.py"
-  action :nothing
+service 'supervisor' do
+  action :restart
 end

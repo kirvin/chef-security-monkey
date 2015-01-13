@@ -1,3 +1,11 @@
+# 0.1.2
+
+Logging and supervisor updates
+
+* Don't hijack supervisor exclusively for security monkey use
+* Centralized logging to /var/log/securitymonkey/
+* Got `securitymonkeyscheduler` to start consistently
+
 # 0.1.1
 
 Development...
